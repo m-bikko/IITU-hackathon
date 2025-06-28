@@ -826,5 +826,53 @@ def create_voice_route():
         logger.error(f"Ошибка создания голосового маршрута: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/psychologist')
+def psychologist():
+    return render_template('psychologist.html')
+
+@app.route('/psychologist_chat', methods=['POST'])
+def psychologist_chat():
+    try:
+        data = request.get_json()
+        user_message = data.get('message', '').strip()
+        
+        if not user_message:
+            return jsonify({'error': 'Сообщение не может быть пустым'}), 400
+        
+        # Промпт для психолога
+        psychologist_prompt = f"""
+        Ты - профессиональный психолог, специализирующийся на работе со слабовидящими и слепыми людьми. 
+        Твоя задача - оказать эмоциональную поддержку, помочь справиться со стрессом и тревогой.
+        
+        Принципы общения:
+        - Будь эмпатичным и понимающим
+        - Используй теплый, поддерживающий тон
+        - Давай практические советы по адаптации
+        - Помогай находить внутренние ресурсы
+        - Не давай медицинских диагнозов
+        - Говори простым, понятным языком
+        - Будь краток, но содержателен (2-3 предложения)
+        
+        Сообщение пользователя: {user_message}
+        
+        Ответь как профессиональный психолог, оказав поддержку и помощь.
+        """
+        
+        # Отправка запроса к Gemini API
+        response = navigation_service.model.generate_content(psychologist_prompt)
+        ai_response = response.text.strip()
+        
+        return jsonify({
+            'response': ai_response,
+            'status': 'success'
+        })
+        
+    except Exception as e:
+        print(f"Ошибка в психологическом чате: {e}")
+        return jsonify({
+            'response': 'Извините, произошла техническая ошибка. Попробуйте еще раз.',
+            'status': 'error'
+        }), 500
+
 if __name__ == '__main__':
     app.run(debug=False, host='127.0.0.1', port=5002) 

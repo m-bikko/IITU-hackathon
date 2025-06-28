@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 Голосовой Психолог - IITU SmartAla</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .chat-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            max-height: 400px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-message {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .psychologist-message {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            margin-right: auto;
+        }
+
+        .psychologist-message::before {
+            content: "🧠 Психолог: ";
+            font-weight: bold;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .mic-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            font-size: 2em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 20px rgba(255, 107, 107, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mic-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.6);
+        }
+
+        .mic-button.recording {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .status-text {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+            min-width: 200px;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            color: #666;
+            font-style: italic;
+            padding: 10px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 3px;
+        }
+
+        .typing-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .navigation-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 50px;
+            font-size: 1.1em;
+            cursor: pointer;
+            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .navigation-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.6);
+        }
+
+        .welcome-message {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.1em;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .chat-container {
+                padding: 20px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="navigation-button">
+        🏠 На главную
+    </a>
+
+    <div class="container">
+        <div class="header">
+            <h1>🧠 Голосовой Психолог</h1>
+            <p>Профессиональная психологическая поддержка для людей с нарушениями зрения</p>
+            <p><em>Говорите свободно - я вас слушаю и понимаю</em></p>
+        </div>
+
+        <div class="chat-container">
+            <div class="welcome-message">
+                <strong>🤗 Добро пожаловать!</strong><br>
+                Я - ваш персональный психолог. Нажмите на микрофон и расскажите, что вас беспокоит. 
+                Я здесь, чтобы выслушать и помочь вам справиться с любыми трудностями.
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <!-- Сообщения будут добавляться здесь -->
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator">
+                <span>🧠 Психолог размышляет</span>
+                <div class="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="mic-button" id="micButton" onclick="toggleRecording()">
+                    🎤
+                </button>
+                <div class="status-text" id="statusText">
+                    Нажмите микрофон для начала разговора
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isRecording = false;
+        let recognition = null;
+        let currentSpeech = null;
+
+        // Инициализация Speech Recognition
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+        } else if ('SpeechRecognition' in window) {
+            recognition = new SpeechRecognition();
+        }
+
+        if (recognition) {
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'ru-RU';
+
+            recognition.onstart = function() {
+                console.log('🎤 Запись началась');
+                document.getElementById('statusText').textContent = 'Слушаю... Говорите сейчас';
+                document.getElementById('micButton').classList.add('recording');
+            };
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                console.log('📝 Распознанный текст:', transcript);
+                
+                addMessage('user', transcript);
+                sendToPsychologist(transcript);
+            };
+
+            recognition.onerror = function(event) {
+                console.error('❌ Ошибка распознавания:', event.error);
+                document.getElementById('statusText').textContent = 'Ошибка распознавания. Попробуйте еще раз';
+                resetRecording();
+            };
+
+            recognition.onend = function() {
+                console.log('🎤 Запись завершена');
+                resetRecording();
+            };
+        }
+
+        // Переключение записи
+        function toggleRecording() {
+            if (!recognition) {
+                alert('Ваш браузер не поддерживает распознавание речи');
+                return;
+            }
+
+            if (isRecording) {
+                recognition.stop();
+            } else {
+                // Останавливаем текущую речь
+                if (currentSpeech) {
+                    speechSynthesis.cancel();
+                    currentSpeech = null;
+                }
+                
+                recognition.start();
+                isRecording = true;
+            }
+        }
+
+        // Сброс состояния записи
+        function resetRecording() {
+            isRecording = false;
+            document.getElementById('micButton').classList.remove('recording');
+            document.getElementById('statusText').textContent = 'Нажмите микрофон для продолжения';
+        }
+
+        // Добавление сообщения в чат
+        function addMessage(sender, text) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.textContent = text;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Отправка сообщения психологу
+        function sendToPsychologist(message) {
+            document.getElementById('statusText').textContent = 'Психолог размышляет над ответом...';
+            document.getElementById('typingIndicator').style.display = 'flex';
+
+            fetch('/psychologist_chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('typingIndicator').style.display = 'none';
+                
+                if (data.status === 'success') {
+                    addMessage('psychologist', data.response);
+                    speakText(data.response);
+                    document.getElementById('statusText').textContent = 'Ответ получен. Нажмите микрофон для продолжения';
+                } else {
+                    addMessage('psychologist', 'Извините, произошла ошибка. Попробуйте еще раз.');
+                    document.getElementById('statusText').textContent = 'Ошибка. Попробуйте еще раз';
+                }
+            })
+            .catch(error => {
+                console.error('❌ Ошибка:', error);
+                document.getElementById('typingIndicator').style.display = 'none';
+                addMessage('psychologist', 'Извините, не удалось получить ответ. Проверьте подключение к интернету.');
+                document.getElementById('statusText').textContent = 'Ошибка соединения';
+            });
+        }
+
+        // Озвучивание текста
+        function speakText(text) {
+            if (currentSpeech) {
+                speechSynthesis.cancel();
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ru-RU';
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+
+            // Поиск русского голоса
+            const voices = speechSynthesis.getVoices();
+            const russianVoice = voices.find(voice => voice.lang.includes('ru'));
+            if (russianVoice) {
+                utterance.voice = russianVoice;
+            }
+
+            utterance.onstart = function() {
+                console.log('🗣️ Начало озвучивания');
+                document.getElementById('statusText').textContent = '🗣️ Психолог отвечает...';
+            };
+
+            utterance.onend = function() {
+                console.log('✅ Озвучивание завершено');
+                document.getElementById('statusText').textContent = 'Нажмите микрофон для продолжения';
+                currentSpeech = null;
+            };
+
+            utterance.onerror = function(event) {
+                console.error('❌ Ошибка озвучивания:', event.error);
+                currentSpeech = null;
+            };
+
+            currentSpeech = utterance;
+            speechSynthesis.speak(utterance);
+        }
+
+        // Инициализация при загрузке страницы
+        window.addEventListener('load', function() {
+            // Приветственное сообщение
+            setTimeout(() => {
+                const welcomeText = "Здравствуйте! Я ваш персональный психолог. Расскажите мне, что вас беспокоит, и я постараюсь помочь вам справиться с трудностями.";
+                addMessage('psychologist', welcomeText);
+                speakText(welcomeText);
+            }, 1000);
+
+            // Загрузка голосов
+            if (speechSynthesis.getVoices().length === 0) {
+                speechSynthesis.addEventListener('voiceschanged', function() {
+                    console.log('✅ Голоса загружены:', speechSynthesis.getVoices().length);
+                });
+            }
+        });
+
+        // Горячие клавиши для доступности
+        document.addEventListener('keydown', function(event) {
+            if (event.code === 'Space' && !event.target.matches('input, textarea')) {
+                event.preventDefault();
+                toggleRecording();
+            }
+            
+            if (event.code === 'Escape') {
+                if (currentSpeech) {
+                    speechSynthesis.cancel();
+                    currentSpeech = null;
+                    document.getElementById('statusText').textContent = 'Озвучивание остановлено';
+                }
+            }
+        });
+    </script>
+</body>
+</html> 
