@@ -1,0 +1,2101 @@
+{% extends "base.html" %}
+
+{% block title %}SmartAla - Навигация{% endblock %}
+
+{% block content %}
+<div class="navigation-container">
+    <header class="nav-header">
+        <h1>🧭 Умная Навигация</h1>
+        <p id="statusText">Нажмите кнопку для начала настройки компаса</p>
+    </header>
+
+    <!-- Панель управления -->
+    <div class="control-panel">
+        <div class="control-group">
+            <button id="calibrateBtn" class="control-btn primary" onclick="startCompassCalibration()">
+                🧭 Настроить компас
+            </button>
+            <button id="captureBtn" class="control-btn secondary" onclick="captureView()" disabled>
+                📸 Определить направление
+            </button>
+            <button id="getCurrentLocationBtn" class="control-btn" onclick="getMyCurrentLocation()">
+                📍 Моё местоположение
+            </button>
+        </div>
+        
+        <div class="control-group">
+            <button id="saveLocationBtn" class="control-btn success" onclick="saveCurrentLocationOnMap()" disabled>
+                💾 Сохранить место
+            </button>
+            <button id="clearMapBtn" class="control-btn warning" onclick="clearMap()">
+                🗑️ Очистить карту
+            </button>
+        </div>
+    </div>
+
+    <!-- Google Maps контейнер -->
+    <div class="map-container">
+        <div id="map" class="leaflet-map"></div>
+        <div class="map-controls">
+            <div class="map-info">
+                <div id="selectedLocationInfo" class="location-info hidden">
+                    <h4>📍 Выбранное место</h4>
+                    <p id="selectedCoords">Координаты будут показаны здесь</p>
+                    <input type="text" id="locationName" placeholder="Введите название места..." class="location-input">
+                    <textarea id="locationDescription" placeholder="Описание (необязательно)..." class="location-input"></textarea>
+                    <select id="locationCategory" class="location-input">
+                        <option value="general">Общее</option>
+                        <option value="home">Дом</option>
+                        <option value="work">Работа</option>
+                        <option value="shop">Магазин</option>
+                        <option value="medical">Медицина</option>
+                        <option value="education">Образование</option>
+                        <option value="transport">Транспорт</option>
+                        <option value="food">Еда</option>
+                        <option value="entertainment">Развлечения</option>
+                    </select>
+                    <button onclick="saveSelectedLocation()" class="save-btn">💾 Сохранить место</button>
+                    <button onclick="clearSelection()" class="cancel-btn">❌ Отменить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Сохранённые места -->
+    <div class="saved-locations-section">
+        <h3>📍 Сохранённые места</h3>
+        <div id="savedLocationsList" class="saved-locations-grid">
+            <!-- Места будут загружены динамически -->
+        </div>
+    </div>
+
+    <!-- Маршрут информация -->
+    <div id="routeInfo" class="route-info hidden">
+        <h3>🛣️ Маршрут</h3>
+        <div id="routeDetails"></div>
+        <button onclick="startNavigation()" class="nav-btn">🧭 Начать навигацию</button>
+    </div>
+</div>
+
+<!-- Destination data for auto-navigation -->
+{% if destination %}
+<script>
+    window.destinationData = {{ destination | tojsonfilter | safe }};
+</script>
+{% endif %}
+
+<style>
+    .navigation-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .nav-header {
+        text-align: center;
+        margin-bottom: 30px;
+        background: rgba(255,255,255,0.1);
+        padding: 25px;
+        border-radius: 15px;
+        backdrop-filter: blur(10px);
+    }
+
+    .nav-header h1 {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+        color: white;
+    }
+
+    .control-panel {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-bottom: 30px;
+        justify-content: center;
+    }
+
+    .control-group {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .control-btn {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 25px;
+        padding: 15px 25px;
+        font-size: 1.1em;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        min-width: 160px;
+    }
+
+    .control-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .control-btn:disabled {
+        background: linear-gradient(45deg, #9e9e9e, #757575);
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .control-btn.primary {
+        background: linear-gradient(45deg, #4CAF50, #45a049);
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+    }
+
+    .control-btn.primary:hover:not(:disabled) {
+        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+    }
+
+    .control-btn.secondary {
+        background: linear-gradient(45deg, #2196F3, #1976D2);
+        box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+    }
+
+    .control-btn.secondary:hover:not(:disabled) {
+        box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+    }
+
+    .control-btn.success {
+        background: linear-gradient(45deg, #FF9800, #F57C00);
+        box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
+    }
+
+    .control-btn.success:hover:not(:disabled) {
+        box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+    }
+
+    .control-btn.warning {
+        background: linear-gradient(45deg, #f44336, #d32f2f);
+        box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+    }
+
+    .control-btn.warning:hover:not(:disabled) {
+        box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
+    }
+
+    .map-container {
+        position: relative;
+        background: rgba(255,255,255,0.1);
+        border-radius: 20px;
+        overflow: hidden;
+        margin-bottom: 30px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+
+    .leaflet-map {
+        width: 100%;
+        height: 600px;
+        border-radius: 20px;
+    }
+
+    .map-controls {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        pointer-events: none;
+        z-index: 1000;
+    }
+
+    .map-info {
+        pointer-events: auto;
+    }
+
+    .location-info {
+        background: rgba(255,255,255,0.95);
+        color: #333;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        backdrop-filter: blur(10px);
+        max-width: 350px;
+    }
+
+    .location-info h4 {
+        margin: 0 0 15px 0;
+        font-size: 1.3em;
+        color: #2c3e50;
+    }
+
+    .location-input {
+        width: 100%;
+        padding: 10px;
+        margin: 8px 0;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 1em;
+        box-sizing: border-box;
+    }
+
+    .location-input:focus {
+        outline: none;
+        border-color: #4CAF50;
+        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+    }
+
+    .save-btn, .cancel-btn, .nav-btn {
+        background: linear-gradient(45deg, #4CAF50, #45a049);
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 10px 20px;
+        margin: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1em;
+    }
+
+    .cancel-btn {
+        background: linear-gradient(45deg, #f44336, #d32f2f);
+    }
+
+    .nav-btn {
+        background: linear-gradient(45deg, #2196F3, #1976D2);
+        font-size: 1.2em;
+        padding: 15px 30px;
+    }
+
+    .save-btn:hover, .cancel-btn:hover, .nav-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .saved-locations-section {
+        background: rgba(255,255,255,0.1);
+        padding: 25px;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        margin-bottom: 30px;
+    }
+
+    .saved-locations-section h3 {
+        text-align: center;
+        margin-bottom: 25px;
+        font-size: 1.8em;
+        color: white;
+    }
+
+    .saved-locations-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .saved-location-card {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 15px;
+        padding: 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+
+    .saved-location-card:hover {
+        transform: translateY(-3px);
+        background: rgba(255,255,255,0.2);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    }
+
+    .saved-location-card h4 {
+        margin: 0 0 10px 0;
+        color: white;
+        font-size: 1.3em;
+    }
+
+    .saved-location-card p {
+        margin: 0 0 10px 0;
+        color: rgba(255,255,255,0.8);
+        font-size: 0.9em;
+    }
+
+    .location-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .action-btn {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        border: none;
+        border-radius: 15px;
+        padding: 8px 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.9em;
+    }
+
+    .action-btn:hover {
+        background: rgba(255,255,255,0.3);
+        transform: scale(1.05);
+    }
+
+    .route-info {
+        background: rgba(255,255,255,0.1);
+        padding: 25px;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        text-align: center;
+    }
+
+    .route-info h3 {
+        margin-bottom: 20px;
+        color: white;
+        font-size: 1.8em;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        .control-group {
+            justify-content: center;
+        }
+        
+        .control-btn {
+            min-width: 140px;
+            padding: 12px 20px;
+            font-size: 1em;
+        }
+        
+        .leaflet-map {
+            height: 400px;
+        }
+        
+        .location-info {
+            max-width: 280px;
+        }
+    }
+</style>
+
+<script>
+    let map;
+    let currentLocationMarker;
+    let selectedLocationMarker;
+    let routePolyline;
+    let currentUserLocation = null;
+    let selectedLocation = null;
+    let savedLocations = [];
+    let savedLocationMarkers = []; // Массив для постоянных маркеров сохраненных мест
+    let isCompassCalibrated = false;
+    let isDirectionCaptured = false;
+
+    // Инициализация карт (вызывается при загрузке страницы)
+    function initMaps() {
+        console.log('🗺️ Инициализация Leaflet карты...');
+        console.log('🔍 Проверка загрузки Leaflet:', typeof L);
+        console.log('🎯 Проверка данных назначения:', window.destinationData);
+        
+        if (typeof L === 'undefined') {
+            console.error('❌ Leaflet не загружен!');
+            speakText('Ошибка загрузки карты. Обновите страницу.');
+            return;
+        }
+        
+        initializeLeafletMap();
+        loadSavedLocations();
+        
+        // ПРОВЕРКА для статических ссылок
+        if (window.destinationData) {
+            console.log('🎯 СТАТИЧЕСКАЯ ССЫЛКА ОБНАРУЖЕНА!');
+            console.log('📊 Данные назначения:', window.destinationData);
+            
+            // НЕМЕДЛЕННО объявляем о начале и запускаем автоматический процесс
+            speakText(`Добро пожаловать! Это статическая ссылка для места ${window.destinationData.name}. Автоматически запускаю процесс навигации.`);
+            
+            // Сразу создаем маркер назначения и запускаем автонавигацию
+            setTimeout(() => {
+                createDestinationMarker();
+                startDirectNavigation(); // НОВАЯ функция - прямая навигация
+            }, 1000);
+            
+        } else {
+            console.log('ℹ️ Обычная страница навигации');
+            speakText('Добро пожаловать в умную навигацию! Для начала нажмите кнопку настройки компаса.');
+        }
+    }
+
+    // Инициализация Leaflet карты
+    function initializeLeafletMap() {
+        try {
+            console.log('🗺️ Создание карты Leaflet...');
+            
+            // Создание карты с центром на Алматы
+            map = L.map('map').setView([43.238293, 76.889709], 13);
+            console.log('✅ Карта создана:', map);
+
+            // Добавление слоя OpenStreetMap
+            const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+            console.log('✅ Слой карты добавлен:', tileLayer);
+
+            // Обработчик клика по карте
+            map.on('click', function(e) {
+                console.log('👆 Клик по карте:', e.latlng);
+                selectLocationOnMap(e.latlng);
+            });
+
+            // Когда карта готова - создаем маркер назначения если есть
+            map.whenReady(function() {
+                console.log('✅ Карта готова!');
+                if (window.destinationData) {
+                    console.log('🎯 Создаем маркер места назначения после готовности карты');
+                    createDestinationMarker();
+                }
+            });
+
+            console.log('✅ Leaflet карта инициализирована успешно');
+            speakText('Карта загружена. Получение вашего местоположения...');
+            
+            // Автоматически получаем геолокацию пользователя при загрузке
+            requestUserLocation();
+
+        } catch (error) {
+            console.error('❌ Ошибка инициализации карты:', error);
+            speakText('Ошибка инициализации карты');
+        }
+    }
+
+    // Создание маркера места назначения
+    function createDestinationMarker() {
+        console.log('🎯 Начинаем createDestinationMarker...');
+        
+        if (!window.destinationData) {
+            console.log('❌ window.destinationData отсутствует');
+            return;
+        }
+        
+        if (!map) {
+            console.log('❌ Карта не готова, повторяем через 500мс');
+            setTimeout(createDestinationMarker, 500);
+            return;
+        }
+        
+        console.log('📊 Данные назначения:', window.destinationData);
+
+        const destination = {
+            lat: parseFloat(window.destinationData.latitude),
+            lng: parseFloat(window.destinationData.longitude)
+        };
+        
+        console.log('📍 Конвертированные координаты:', destination);
+        
+        // Проверяем валидность координат
+        if (isNaN(destination.lat) || isNaN(destination.lng)) {
+            console.error('❌ Неверные координаты!', destination);
+            return;
+        }
+
+        // Удаляем старый маркер
+        if (selectedLocationMarker) {
+            console.log('🗑️ Удаляем старый маркер');
+            map.removeLayer(selectedLocationMarker);
+        }
+
+        try {
+            console.log('🎯 Создаем маркер на координатах:', destination.lat, destination.lng);
+            
+            // Простой яркий красный маркер
+            selectedLocationMarker = L.marker([destination.lat, destination.lng], {
+                icon: L.divIcon({
+                    html: '<div style="background: #FF0000; color: white; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border: 4px solid white; font-size: 24px; font-weight: bold; box-shadow: 0 4px 15px rgba(255,0,0,0.5);">🎯</div>',
+                    className: 'destination-marker-big',
+                    iconSize: [50, 50],
+                    iconAnchor: [25, 25]
+                })
+            });
+            
+            console.log('✅ Маркер создан, добавляем на карту...');
+            selectedLocationMarker.addTo(map);
+            console.log('✅ Маркер добавлен на карту!');
+
+            // Устанавливаем глобальную переменную
+            selectedLocation = destination;
+            console.log('✅ selectedLocation установлен:', selectedLocation);
+
+            // Popup с информацией
+            const popupContent = `
+                <div style="text-align: center; font-weight: bold; min-width: 200px;">
+                    <div style="color: #FF0000; font-size: 18px; margin-bottom: 8px;">
+                        🎯 ${window.destinationData.name}
+                    </div>
+                    <div style="margin: 5px 0; color: #333;">
+                        ${window.destinationData.description || 'Место назначения'}
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 8px;">
+                        📍 ${destination.lat.toFixed(6)}, ${destination.lng.toFixed(6)}
+                    </div>
+                    <div style="margin-top: 8px; padding: 4px 8px; background: #FF0000; color: white; border-radius: 12px; font-size: 11px;">
+                        🚀 Автоматическая навигация
+                    </div>
+                </div>
+            `;
+            
+            selectedLocationMarker.bindPopup(popupContent);
+            console.log('✅ Popup создан');
+            
+            // СРАЗУ открываем popup
+            selectedLocationMarker.openPopup();
+            console.log('✅ Popup открыт');
+
+            // Центрируем карту на маркере с увеличением
+            map.setView([destination.lat, destination.lng], 17);
+            console.log('✅ Карта центрирована на маркере');
+
+            // Обновляем информацию в боковой панели
+            document.getElementById('selectedCoords').textContent = 
+                `Широта: ${destination.lat.toFixed(6)}, Долгота: ${destination.lng.toFixed(6)}`;
+            document.getElementById('selectedLocationInfo').classList.remove('hidden');
+            
+            // Заполняем поля
+            document.getElementById('locationName').value = window.destinationData.name;
+            document.getElementById('locationDescription').value = window.destinationData.description || '';
+            document.getElementById('locationCategory').value = window.destinationData.category || 'general';
+            
+            // Отключаем сохранение (уже сохранено)
+            document.getElementById('saveLocationBtn').disabled = true;
+            document.getElementById('saveLocationBtn').textContent = '✅ Уже сохранено';
+
+            speakText(`Место назначения ${window.destinationData.name} отображено на карте. Координаты ${destination.lat.toFixed(3)}, ${destination.lng.toFixed(3)}`);
+            
+            console.log('🎉 Маркер успешно создан и отображен!');
+            
+        } catch (error) {
+            console.error('❌ Ошибка создания маркера:', error);
+            speakText('Ошибка отображения места назначения на карте');
+        }
+    }
+
+    // Запрос геолокации пользователя при загрузке
+    function requestUserLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    currentUserLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+
+                    // Удаляем ТОЛЬКО старый маркер текущего местоположения (НЕ маркер назначения!)
+                    if (currentLocationMarker) {
+                        map.removeLayer(currentLocationMarker);
+                    }
+
+                    // Создаём маркер текущего местоположения с анимацией
+                    currentLocationMarker = L.marker([currentUserLocation.lat, currentUserLocation.lng], {
+                        icon: L.divIcon({
+                            html: `<div style="
+                                background: linear-gradient(45deg, #4CAF50, #45a049); 
+                                color: white; 
+                                border-radius: 50%; 
+                                width: 40px; 
+                                height: 40px; 
+                                display: flex; 
+                                align-items: center; 
+                                justify-content: center; 
+                                border: 3px solid white; 
+                                box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+                                animation: pulse 2s infinite;
+                                font-size: 18px;
+                            ">📍
+                            </div>
+                            <style>
+                            @keyframes pulse {
+                                0% { transform: scale(1); box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4); }
+                                50% { transform: scale(1.1); box-shadow: 0 6px 25px rgba(76, 175, 80, 0.6); }
+                                100% { transform: scale(1); box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4); }
+                            }
+                            </style>`,
+                            className: 'current-location-icon',
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 20]
+                        })
+                    }).addTo(map);
+
+                    // Добавляем всплывающую подсказку
+                    currentLocationMarker.bindPopup(`
+                        <div style="text-align: center; font-weight: bold;">
+                            <div style="font-size: 16px; color: #4CAF50; margin-bottom: 5px;">📍 Ваше местоположение</div>
+                            <div style="font-size: 12px; color: #666;">
+                                Широта: ${currentUserLocation.lat.toFixed(6)}<br>
+                                Долгота: ${currentUserLocation.lng.toFixed(6)}
+                            </div>
+                        </div>
+                    `);
+
+                    console.log('✅ Маркер текущего местоположения создан');
+                    console.log('🔍 Проверяем маркер назначения:', selectedLocationMarker ? 'Есть' : 'НЕТ!');
+
+                    // ВАЖНО: Если есть маркер назначения - НЕ УДАЛЯЕМ его!
+                    if (selectedLocation && selectedLocationMarker) {
+                        console.log('✅ Маркер назначения сохранен, показываем оба маркера');
+                        
+                        // Центрируем карту так чтобы были видны оба маркера
+                        const group = new L.featureGroup([currentLocationMarker, selectedLocationMarker]);
+                        map.fitBounds(group.getBounds().pad(0.1));
+                        
+                        // Строим маршрут
+                        calculateAndDisplayRoute(currentUserLocation, selectedLocation);
+                        
+                        if (window.destinationData) {
+                            speakText(`Ваше местоположение найдено. Маршрут к месту ${window.destinationData.name} построен. Начинаю автоматическую голосовую навигацию.`);
+                            
+                            // Автоматически запускаем навигацию
+                            setTimeout(() => {
+                                startNavigation();
+                            }, 2000);
+                        } else {
+                            speakText(`Ваше местоположение найдено. Строю маршрут к выбранному месту.`);
+                        }
+                    } else if (selectedLocation && !selectedLocationMarker) {
+                        // Если есть selectedLocation но нет маркера - пересоздаем маркер
+                        console.warn('⚠️ Маркер назначения потерян, пересоздаем...');
+                        if (window.destinationData) {
+                            createDestinationMarker();
+                        }
+                        calculateAndDisplayRoute(currentUserLocation, selectedLocation);
+                    } else {
+                        // Только текущее местоположение
+                        map.setView([currentUserLocation.lat, currentUserLocation.lng], 15);
+                        speakText(`Ваше местоположение найдено и отображено на карте. Широта ${currentUserLocation.lat.toFixed(3)}, долгота ${currentUserLocation.lng.toFixed(3)}. Нажмите на карту чтобы выбрать место назначения.`);
+                    }
+                },
+                function(error) {
+                    console.error('Ошибка геолокации при загрузке:', error);
+                    let errorMessage = '';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage = 'Доступ к геолокации запрещен. Разрешите доступ для лучшей навигации.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage = 'Местоположение недоступно. Проверьте GPS или интернет соединение.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage = 'Время ожидания геолокации истекло. Попробуйте снова.';
+                            break;
+                        default:
+                            errorMessage = 'Произошла ошибка при определении местоположения.';
+                            break;
+                    }
+                    speakText(errorMessage + ' Вы можете нажать кнопку "Моё местоположение" чтобы попробовать снова.');
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,  // Увеличиваем время ожидания
+                    maximumAge: 30000  // Уменьшаем время кэша
+                }
+            );
+        } else {
+            speakText('Геолокация не поддерживается вашим браузером. Вы можете выбрать место на карте вручную.');
+        }
+    }
+
+    // Выбор локации на карте
+    function selectLocationOnMap(latlng) {
+        selectedLocation = {
+            lat: latlng.lat,
+            lng: latlng.lng
+        };
+
+        // ВАЖНО: если это статическая ссылка - НЕ ПЕРЕЗАПИСЫВАЕМ маркер назначения!
+        if (window.destinationData) {
+            console.log('🚫 Статическая ссылка - маркер назначения защищен от перезаписи');
+            speakText('Место назначения уже установлено для этой статической ссылки');
+            return;
+        }
+
+        // Удаляем предыдущий маркер выбранного места (только для обычной навигации)
+        if (selectedLocationMarker) {
+            map.removeLayer(selectedLocationMarker);
+        }
+
+        // Создаём новый маркер
+        selectedLocationMarker = L.marker([selectedLocation.lat, selectedLocation.lng], {
+            icon: L.divIcon({
+                html: '<div style="background: #FF5722; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">📍</div>',
+                className: 'custom-div-icon',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            })
+        }).addTo(map);
+
+        // Показываем информацию о выбранном месте
+        document.getElementById('selectedCoords').textContent = 
+            `Широта: ${selectedLocation.lat.toFixed(6)}, Долгота: ${selectedLocation.lng.toFixed(6)}`;
+        document.getElementById('selectedLocationInfo').classList.remove('hidden');
+        document.getElementById('saveLocationBtn').disabled = false;
+
+        speakText(`Место выбрано. Координаты: ${selectedLocation.lat.toFixed(3)}, ${selectedLocation.lng.toFixed(3)}`);
+        
+        // Если есть текущее местоположение, строим маршрут
+        if (currentUserLocation) {
+            calculateAndDisplayRoute(currentUserLocation, selectedLocation);
+        }
+    }
+
+    // Настройка компаса
+    function startCompassCalibration() {
+        speakText('Начинаю калибровку компаса. Поверните устройство в виде восьмёрки.');
+        document.getElementById('statusText').textContent = 'Калибровка компаса... Поверните устройство в виде восьмёрки';
+        document.getElementById('calibrateBtn').disabled = true;
+
+        // Симуляция калибровки компаса
+        setTimeout(() => {
+            fetch('/calibrate_compass', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'calibrate' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    isCompassCalibrated = true;
+                    document.getElementById('statusText').textContent = 'Компас настроен! Теперь можно определить направление.';
+                    document.getElementById('captureBtn').disabled = false;
+                    document.getElementById('calibrateBtn').textContent = '✅ Компас настроен';
+                    speakText('Компас успешно настроен. Теперь нажмите кнопку определения направления.');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка калибровки:', error);
+                document.getElementById('calibrateBtn').disabled = false;
+                speakText('Ошибка калибровки компаса. Попробуйте ещё раз.');
+            });
+        }, 3000);
+    }
+
+    // Определение направления
+    function captureView() {
+        if (!isCompassCalibrated) {
+            speakText('Сначала настройте компас');
+            return;
+        }
+
+        speakText('Определяю направление взгляда с помощью камеры и искусственного интеллекта');
+        document.getElementById('statusText').textContent = 'Определение направления...';
+        document.getElementById('captureBtn').disabled = true;
+
+        // Симуляция захвата изображения
+        setTimeout(() => {
+            fetch('/capture_view', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'capture' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    isDirectionCaptured = true;
+                    document.getElementById('statusText').textContent = 'Направление определено! Можно начать навигацию.';
+                    document.getElementById('captureBtn').textContent = '✅ Направление определено';
+                    speakText('Направление успешно определено. Теперь можно выбрать место на карте или получить текущее местоположение.');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка определения направления:', error);
+                document.getElementById('captureBtn').disabled = false;
+                speakText('Ошибка определения направления. Попробуйте ещё раз.');
+            });
+        }, 2000);
+    }
+
+    // Получение текущего местоположения (кнопка)
+    function getMyCurrentLocation() {
+        console.log('🔘 Нажата кнопка "Моё местоположение"');
+        speakText('Обновляю ваше местоположение');
+        document.getElementById('statusText').textContent = 'Получение местоположения...';
+        
+        // Показываем индикатор загрузки на кнопке
+        const button = document.getElementById('getCurrentLocationBtn');
+        const originalText = button.textContent;
+        button.textContent = '⏳ Поиск...';
+        button.disabled = true;
+
+        // ВАЖНО: Проверяем поддержку геолокации
+        if (!navigator.geolocation) {
+            console.error('❌ Геолокация не поддерживается');
+            speakText('Геолокация не поддерживается вашим браузером');
+            button.textContent = originalText;
+            button.disabled = false;
+            return;
+        }
+
+        // Запрашиваем текущее местоположение
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                console.log('✅ Получено местоположение:', position.coords);
+                
+                currentUserLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+
+                // Удаляем ТОЛЬКО старый маркер текущего местоположения (НЕ маркер назначения!)
+                if (currentLocationMarker) {
+                    console.log('🗑️ Удаляем старый маркер текущего местоположения');
+                    map.removeLayer(currentLocationMarker);
+                }
+
+                // Создаём маркер текущего местоположения с анимацией
+                currentLocationMarker = L.marker([currentUserLocation.lat, currentUserLocation.lng], {
+                    icon: L.divIcon({
+                        html: `<div style="
+                            background: linear-gradient(45deg, #4CAF50, #45a049); 
+                            color: white; 
+                            border-radius: 50%; 
+                            width: 40px; 
+                            height: 40px; 
+                            display: flex; 
+                            align-items: center; 
+                            justify-content: center; 
+                            border: 3px solid white; 
+                            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+                            animation: pulse 2s infinite;
+                            font-size: 18px;
+                        ">📍
+                        </div>
+                        <style>
+                        @keyframes pulse {
+                            0% { transform: scale(1); box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4); }
+                            50% { transform: scale(1.1); box-shadow: 0 6px 25px rgba(76, 175, 80, 0.6); }
+                            100% { transform: scale(1); box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4); }
+                        }
+                        </style>`,
+                        className: 'current-location-icon',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 20]
+                    })
+                }).addTo(map);
+
+                // Добавляем всплывающую подсказку
+                currentLocationMarker.bindPopup(`
+                    <div style="text-align: center; font-weight: bold;">
+                        <div style="font-size: 16px; color: #4CAF50; margin-bottom: 5px;">📍 Ваше местоположение</div>
+                        <div style="font-size: 12px; color: #666;">
+                            Широта: ${currentUserLocation.lat.toFixed(6)}<br>
+                            Долгота: ${currentUserLocation.lng.toFixed(6)}
+                        </div>
+                    </div>
+                `);
+
+                console.log('✅ Маркер текущего местоположения создан');
+                console.log('🔍 Проверяем маркер назначения:', selectedLocationMarker ? 'Есть' : 'НЕТ!');
+
+                // Восстанавливаем кнопку
+                button.textContent = '✅ Местоположение найдено';
+                button.disabled = false;
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 2000);
+
+                // ВАЖНО: Если есть маркер назначения - НЕ УДАЛЯЕМ его!
+                if (selectedLocation && selectedLocationMarker) {
+                    console.log('✅ Маркер назначения сохранен, показываем оба маркера');
+                    
+                    // Центрируем карту так чтобы были видны оба маркера
+                    const group = new L.featureGroup([currentLocationMarker, selectedLocationMarker]);
+                    map.fitBounds(group.getBounds().pad(0.1));
+                    
+                    // Строим маршрут
+                    calculateAndDisplayRoute(currentUserLocation, selectedLocation);
+                    
+                    if (window.destinationData) {
+                        speakText(`Ваше местоположение обновлено. Маршрут к месту ${window.destinationData.name} перестроен.`);
+                    } else {
+                        speakText(`Ваше местоположение обновлено. Маршрут к выбранному месту перестроен.`);
+                    }
+                } else {
+                    // Только текущее местоположение
+                    map.setView([currentUserLocation.lat, currentUserLocation.lng], 15);
+                    speakText(`Ваше местоположение найдено и отображено на карте. Широта ${currentUserLocation.lat.toFixed(3)}, долгота ${currentUserLocation.lng.toFixed(3)}. Нажмите на карту чтобы выбрать место назначения.`);
+                }
+                
+                document.getElementById('statusText').textContent = 'Готов к навигации!';
+            },
+            function(error) {
+                console.error('❌ Ошибка геолокации кнопки:', error);
+                
+                // Восстанавливаем кнопку
+                button.textContent = originalText;
+                button.disabled = false;
+                
+                let errorMessage = '';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = 'Доступ к геолокации запрещен. Разрешите доступ в настройках браузера.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = 'Местоположение недоступно. Проверьте GPS или интернет соединение.';
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = 'Время ожидания геолокации истекло. Попробуйте снова.';
+                        break;
+                    default:
+                        errorMessage = 'Произошла ошибка при определении местоположения.';
+                        break;
+                }
+                speakText(errorMessage);
+                document.getElementById('statusText').textContent = errorMessage;
+                console.log('🔄 Попробуйте нажать кнопку еще раз');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,  // Увеличиваем время ожидания
+                maximumAge: 30000  // Уменьшаем время кэша
+            }
+        );
+    }
+
+    // Построение маршрута (эмуляция)
+    function calculateAndDisplayRoute(origin, destination) {
+        console.log('🛣️ Построение маршрута от', origin, 'до', destination);
+        
+        // Удаляем предыдущий маршрут
+        if (routePolyline) {
+            map.removeLayer(routePolyline);
+        }
+        
+        // Создаем эмулированный маршрут
+        const route = generateEmulatedRoute(origin, destination);
+        
+        // Отображаем маршрут на карте
+        const latlngs = route.path.map(point => [point.lat, point.lng]);
+        routePolyline = L.polyline(latlngs, {
+            color: '#FF0000',
+            weight: 4,
+            opacity: 0.8
+        }).addTo(map);
+        
+        // Центрируем карту на маршруте
+        map.fitBounds(routePolyline.getBounds());
+        
+        // Показываем информацию о маршруте
+        document.getElementById('routeInfo').classList.remove('hidden');
+        document.getElementById('routeDetails').innerHTML = `
+            <div style="color: white; text-align: left;">
+                <p><strong>🚶 Расстояние:</strong> ${route.legs[0].distance.text}</p>
+                <p><strong>⏱️ Время в пути:</strong> ${route.legs[0].duration.text}</p>
+                <p><strong>📍 От:</strong> ${route.legs[0].start_address}</p>
+                <p><strong>🎯 До:</strong> ${route.legs[0].end_address}</p>
+            </div>
+        `;
+
+        speakText(`Маршрут построен. Расстояние ${route.legs[0].distance.text}, время в пути ${route.legs[0].duration.text}`);
+    }
+    
+    // Генерация эмулированного маршрута
+    function generateEmulatedRoute(origin, destination) {
+        const startLat = origin.lat;
+        const startLng = origin.lng;
+        const endLat = destination.lat;
+        const endLng = destination.lng;
+        
+        // Вычисляем расстояние и время
+        const distance = calculateDistance(startLat, startLng, endLat, endLng);
+        const distanceMeters = Math.round(distance * 1000);
+        const durationMinutes = Math.round(distanceMeters / 80); // ~5 км/ч пешком
+        
+        // Создаем путь с промежуточными точками для реалистичности
+        const path = generateWalkingPath(startLat, startLng, endLat, endLng);
+        
+        // Генерируем адреса
+        const startAddress = generateAlmatyAddress(startLat, startLng);
+        const endAddress = generateAlmatyAddress(endLat, endLng);
+        
+        return {
+            path: path,
+            legs: [{
+                distance: {
+                    text: distanceMeters < 1000 ? `${distanceMeters} м` : `${(distance).toFixed(1)} км`,
+                    value: distanceMeters
+                },
+                duration: {
+                    text: durationMinutes < 60 ? `${durationMinutes} мин` : `${Math.floor(durationMinutes/60)} ч ${durationMinutes%60} мин`,
+                    value: durationMinutes * 60
+                },
+                start_address: startAddress,
+                end_address: endAddress
+            }]
+        };
+    }
+    
+    // Генерация реалистичного пешеходного пути
+    function generateWalkingPath(startLat, startLng, endLat, endLng) {
+        const path = [];
+        const steps = 8; // Количество промежуточных точек
+        
+        // Добавляем случайное отклонение для реалистичности
+        const randomFactor = 0.001; // Максимальное отклонение
+        
+        for (let i = 0; i <= steps; i++) {
+            const ratio = i / steps;
+            
+            // Интерполяция с небольшим случайным отклонением
+            const lat = startLat + (endLat - startLat) * ratio + (Math.random() - 0.5) * randomFactor;
+            const lng = startLng + (endLng - startLng) * ratio + (Math.random() - 0.5) * randomFactor;
+            
+            path.push({ lat: lat, lng: lng });
+        }
+        
+        return path;
+    }
+    
+    // Генерация адресов Алматы
+    function generateAlmatyAddress(lat, lng) {
+        const almatyStreets = [
+            'проспект Абая', 'улица Сатпаева', 'проспект Аль-Фараби',
+            'улица Толе би', 'проспект Назарбаева', 'улица Жибек Жолы',
+            'проспект Достык', 'улица Манаса', 'улица Богенбай батыра',
+            'проспект Райымбека', 'улица Курмангазы', 'улица Кабанбай батыра'
+        ];
+        
+        // Выбираем улицу на основе координат (для консистентности)
+        const streetIndex = Math.floor((lat + lng) * 1000) % almatyStreets.length;
+        const street = almatyStreets[streetIndex];
+        const houseNumber = Math.floor((lat + lng) * 10000) % 200 + 1;
+        
+        return `${street}, ${houseNumber}, Алматы`;
+    }
+    
+    // Функция расчета расстояния
+    function calculateDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371; // Радиус Земли в км
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    // Сохранение места на карте
+    function saveCurrentLocationOnMap() {
+        if (!selectedLocation) {
+            speakText('Сначала выберите место на карте');
+            return;
+        }
+        document.getElementById('selectedLocationInfo').classList.remove('hidden');
+        document.getElementById('locationName').focus();
+    }
+
+    // Сохранение выбранной локации
+    function saveSelectedLocation() {
+        const name = document.getElementById('locationName').value.trim();
+        const description = document.getElementById('locationDescription').value.trim();
+        const category = document.getElementById('locationCategory').value;
+
+        if (!name) {
+            speakText('Введите название места');
+            document.getElementById('locationName').focus();
+            return;
+        }
+
+        if (!selectedLocation) {
+            speakText('Место не выбрано');
+            return;
+        }
+
+        const locationData = {
+            location: selectedLocation,
+            name: name,
+            description: description,
+            category: category
+        };
+
+        fetch('/save_location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(locationData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                speakText(`Место ${name} успешно сохранено`);
+                
+                // НОВОЕ: Создаем постоянный маркер для нового места
+                const newLocation = data.location_data;
+                createPermanentLocationMarker(newLocation);
+                
+                // Добавляем в массив сохраненных мест
+                savedLocations.push(newLocation);
+                
+                clearSelection();
+                loadSavedLocations(); // Обновляем список
+                
+                // Показываем уведомление со ссылкой
+                showNotification(`Место сохранено! Статическая ссылка: ${data.static_url}`, 'success');
+                
+                console.log('✅ Новое место сохранено и отображено на карте:', newLocation.name);
+            } else {
+                throw new Error(data.error || 'Ошибка сохранения');
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка сохранения:', error);
+            speakText('Ошибка при сохранении места');
+        });
+    }
+
+    // Очистка выбора
+    function clearSelection() {
+        selectedLocation = null;
+        if (selectedLocationMarker) {
+            map.removeLayer(selectedLocationMarker);
+            selectedLocationMarker = null;
+        }
+        document.getElementById('selectedLocationInfo').classList.add('hidden');
+        document.getElementById('saveLocationBtn').disabled = true;
+        document.getElementById('locationName').value = '';
+        document.getElementById('locationDescription').value = '';
+        document.getElementById('locationCategory').value = 'general';
+    }
+
+    // Очистка карты
+    function clearMap() {
+        // Для статических ссылок - НЕ удаляем маркер назначения
+        if (window.destinationData) {
+            console.log('🚫 Статическая ссылка - маркер назначения защищен от удаления');
+            speakText('Место назначения защищено от удаления для статической ссылки');
+            
+            // Удаляем только маршрут
+            if (routePolyline) {
+                map.removeLayer(routePolyline);
+                routePolyline = null;
+            }
+            document.getElementById('routeInfo').classList.add('hidden');
+            return;
+        }
+        
+        // Обычная очистка для страницы навигации
+        if (selectedLocationMarker) {
+            map.removeLayer(selectedLocationMarker);
+            selectedLocationMarker = null;
+        }
+        if (routePolyline) {
+            map.removeLayer(routePolyline);
+            routePolyline = null;
+        }
+        document.getElementById('routeInfo').classList.add('hidden');
+        clearSelection();
+        speakText('Карта очищена');
+    }
+
+    // Загрузка сохранённых мест
+    async function loadSavedLocations() {
+        try {
+            const response = await fetch('/list_saved_locations');
+            const data = await response.json();
+            
+            if (data.success && data.locations.length > 0) {
+                savedLocations = data.locations;
+                displaySavedLocations();
+                
+                // НОВОЕ: Отображаем все сохраненные места на карте как постоянные маркеры
+                if (map) {
+                    displaySavedLocationsOnMap();
+                }
+                
+                console.log(`✅ Загружено ${savedLocations.length} сохраненных мест и отображено на карте`);
+            } else {
+                document.getElementById('savedLocationsList').innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; color: white; padding: 40px;">
+                        <p>🗺️ Пока нет сохранённых мест</p>
+                        <p style="opacity: 0.7;">Нажмите на карту чтобы выбрать и сохранить место</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки сохранённых мест:', error);
+        }
+    }
+
+    // Отображение сохранённых мест
+    function displaySavedLocations() {
+        const container = document.getElementById('savedLocationsList');
+        container.innerHTML = savedLocations.map(location => `
+            <div class="saved-location-card" onclick="selectSavedLocation('${location.id}')">
+                <h4>${getCategoryIcon(location.category)} ${location.name}</h4>
+                <p>${location.description || 'Без описания'}</p>
+                <p style="font-size: 0.8em; opacity: 0.7;">
+                    💾 ${formatDate(location.timestamp)} | 👁️ ${location.access_count}
+                </p>
+                <div class="location-actions">
+                    <button class="action-btn" onclick="event.stopPropagation(); navigateToSavedLocation('${location.id}')">
+                        🧭 
+                    </button>
+                    <button class="action-btn" onclick="event.stopPropagation(); showOnMap('${location.id}')">
+                        🗺️ 
+                    </button>
+                    <button class="action-btn" onclick="event.stopPropagation(); copyLocationLink('${location.id}')">
+                        🔗 
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Выбор сохранённого места
+    function selectSavedLocation(locationId) {
+        const location = savedLocations.find(loc => loc.id === locationId);
+        if (location) {
+            selectedLocation = { lat: location.lat, lng: location.lng };
+            selectLocationOnMap({ lat: location.lat, lng: location.lng });
+            map.setView([location.lat, location.lng], 16);
+            speakText(`Выбрано место ${location.name}`);
+        }
+    }
+
+    // Показать место на карте
+    function showOnMap(locationId) {
+        const location = savedLocations.find(loc => loc.id === locationId);
+        if (location) {
+            // Находим постоянный маркер этого места
+            const marker = findSavedLocationMarker(locationId);
+            
+            if (marker) {
+                // Центрируем карту на маркере
+                map.setView([location.lat, location.lng], 17);
+                
+                // Открываем popup маркера
+                marker.openPopup();
+                
+                // Добавляем временную анимацию для привлечения внимания
+                const markerElement = marker.getElement();
+                if (markerElement) {
+                    markerElement.style.animation = 'bounce 1s ease-in-out 3';
+                }
+                
+                speakText(`Показываю место ${location.name} на карте`);
+                console.log('✅ Показано место на карте:', location.name);
+            } else {
+                console.warn('⚠️ Маркер не найден, создаю новый');
+                // Fallback - создаем маркер если его нет
+                createPermanentLocationMarker(location);
+                map.setView([location.lat, location.lng], 17);
+                speakText(`Показываю место ${location.name} на карте`);
+            }
+        }
+    }
+
+    // Навигация к сохранённому месту
+    function navigateToSavedLocation(locationId) {
+        window.location.href = `/location/${locationId}`;
+    }
+
+    // Копирование ссылки
+    function copyLocationLink(locationId) {
+        const link = `${window.location.origin}/location/${locationId}`;
+        navigator.clipboard.writeText(link).then(() => {
+            speakText('Ссылка скопирована в буфер обмена');
+            showNotification('Ссылка скопирована!', 'success');
+        }).catch(err => {
+            console.error('Ошибка копирования:', err);
+            speakText('Ошибка копирования ссылки');
+        });
+    }
+
+    // Автоматическая навигация для статических ссылок
+    function startAutoNavigation() {
+        console.log('🎯 Начинаем ПОЛНОСТЬЮ автоматическую навигацию');
+        
+        if (!window.destinationData) {
+            console.error('❌ Данные отсутствуют!');
+            return;
+        }
+        
+        // ВИЗУАЛЬНЫЙ индикатор автоматического процесса
+        document.getElementById('statusText').textContent = '🤖 АВТОМАТИЧЕСКИЙ РЕЖИМ: Настройка навигации...';
+        document.getElementById('statusText').style.cssText = `
+            background: linear-gradient(45deg, #FF6B35, #F7931E);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            animation: autoProcessPulse 2s infinite;
+        `;
+        
+        // Добавляем CSS анимацию если её нет
+        if (!document.getElementById('autoProcessStyles')) {
+            const style = document.createElement('style');
+            style.id = 'autoProcessStyles';
+            style.textContent = `
+                @keyframes autoProcessPulse {
+                    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.7); }
+                    50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(255, 107, 53, 0); }
+                    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 107, 53, 0); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // НЕМЕДЛЕННО объявляем о начале автоматического процесса
+        speakText(`Добро пожаловать! Автоматически настраиваю навигацию к месту ${window.destinationData.name}. Начинаю калибровку компаса, затем определение направления и построение маршрута. Процесс займет несколько секунд.`);
+        
+        // Создаем маркер если карта готова
+        if (map) {
+            createDestinationMarker();
+        }
+        
+        // Автоматически проходим все этапы последовательно
+        setTimeout(() => {
+            autoCompassCalibration();
+        }, 2000); // Даем время на объявление
+    }
+
+    // Автоматическая калибровка компаса (без участия пользователя)
+    function autoCompassCalibration() {
+        console.log('🧭 АВТОМАТИЧЕСКАЯ калибровка компаса...');
+        speakText('Автоматически настраиваю компас');
+        
+        // Визуально показываем что процесс идет
+        document.getElementById('statusText').textContent = 'Автоматическая калибровка компаса...';
+        document.getElementById('calibrateBtn').disabled = true;
+        document.getElementById('calibrateBtn').textContent = '⏳ Автокалибровка...';
+
+        // Эмуляция автоматической калибровки
+        fetch('/calibrate_compass', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'auto_calibrate' })
+        })
+        .then(response => response.json())
+        .then(data => {
+            isCompassCalibrated = true;
+            document.getElementById('statusText').textContent = 'Компас настроен автоматически!';
+            document.getElementById('calibrateBtn').textContent = '✅ Компас настроен';
+            console.log('✅ Автоматическая калибровка завершена');
+            speakText('Компас настроен. Определяю направление.');
+            
+            // Автоматически переходим к определению направления
+            setTimeout(() => {
+                autoCaptureView();
+            }, 1500);
+        })
+        .catch(error => {
+            console.error('Ошибка автокалибровки:', error);
+            // Продолжаем даже при ошибке
+            isCompassCalibrated = true;
+            document.getElementById('calibrateBtn').textContent = '⚠️ Пропущено';
+            speakText('Калибровка пропущена. Определяю направление.');
+            setTimeout(() => {
+                autoCaptureView();
+            }, 1000);
+        });
+    }
+
+    // Автоматическое определение направления (без участия пользователя)
+    function autoCaptureView() {
+        console.log('📸 АВТОМАТИЧЕСКОЕ определение направления...');
+        speakText('Автоматически определяю направление взгляда с помощью камеры');
+        
+        document.getElementById('statusText').textContent = 'Автоматическое определение направления...';
+        document.getElementById('captureBtn').disabled = true;
+        document.getElementById('captureBtn').textContent = '⏳ Автоопределение...';
+
+        // Эмуляция автоматического определения направления
+        fetch('/capture_view', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'auto_capture' })
+        })
+        .then(response => response.json())
+        .then(data => {
+            isDirectionCaptured = true;
+            document.getElementById('statusText').textContent = 'Направление определено автоматически!';
+            document.getElementById('captureBtn').textContent = '✅ Направление определено';
+            console.log('✅ Автоматическое определение направления завершено');
+            speakText('Направление определено. Получаю ваше местоположение для построения маршрута.');
+            
+            // Автоматически получаем геолокацию и строим маршрут
+            setTimeout(() => {
+                autoGetLocationAndRoute();
+            }, 1500);
+        })
+        .catch(error => {
+            console.error('Ошибка автоопределения:', error);
+            // Продолжаем даже при ошибке
+            isDirectionCaptured = true;
+            document.getElementById('captureBtn').textContent = '⚠️ Пропущено';
+            speakText('Определение направления пропущено. Получаю местоположение.');
+            setTimeout(() => {
+                autoGetLocationAndRoute();
+            }, 1000);
+        });
+    }
+
+    // Автоматическое получение местоположения и построение маршрута
+    function autoGetLocationAndRoute() {
+        console.log('📍 АВТОМАТИЧЕСКОЕ получение местоположения...');
+        speakText('Получаю ваше местоположение для построения маршрута');
+        
+        document.getElementById('statusText').textContent = 'Определение вашего местоположения...';
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    currentUserLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+
+                    // Создаем маркер текущего местоположения
+                    if (currentLocationMarker) {
+                        map.removeLayer(currentLocationMarker);
+                    }
+
+                    currentLocationMarker = L.marker([currentUserLocation.lat, currentUserLocation.lng], {
+                        icon: L.divIcon({
+                            html: `<div style="
+                                background: linear-gradient(45deg, #4CAF50, #45a049); 
+                                color: white; 
+                                border-radius: 50%; 
+                                width: 40px; 
+                                height: 40px; 
+                                display: flex; 
+                                align-items: center; 
+                                justify-content: center; 
+                                border: 3px solid white; 
+                                box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+                                font-size: 18px;
+                            ">📍</div>`,
+                            className: 'current-location-icon',
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 20]
+                        })
+                    }).addTo(map);
+
+                    currentLocationMarker.bindPopup(`
+                        <div style="text-align: center; font-weight: bold;">
+                            <div style="font-size: 16px; color: #4CAF50;">📍 Ваше местоположение</div>
+                        </div>
+                    `);
+
+                    console.log('✅ Местоположение получено, строим маршрут');
+                    speakText(`Местоположение найдено. Строю маршрут к месту ${window.destinationData.name}`);
+
+                    // Показываем оба маркера на карте
+                    if (selectedLocationMarker) {
+                        const group = new L.featureGroup([currentLocationMarker, selectedLocationMarker]);
+                        map.fitBounds(group.getBounds().pad(0.1));
+                    }
+
+                    // Автоматически строим маршрут
+                    setTimeout(() => {
+                        autoCalculateRoute();
+                    }, 1500);
+                },
+                function(error) {
+                    console.error('Ошибка геолокации:', error);
+                    speakText('Не удалось получить точное местоположение. Использую приблизительные координаты Алматы для демонстрации маршрута.');
+                    
+                    // Используем центр Алматы как fallback
+                    currentUserLocation = { lat: 43.238293, lng: 76.889709 };
+                    
+                    setTimeout(() => {
+                        autoCalculateRoute();
+                    }, 1000);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 30000
+                }
+            );
+        } else {
+            speakText('Геолокация не поддерживается. Использую центр Алматы для демонстрации.');
+            currentUserLocation = { lat: 43.238293, lng: 76.889709 };
+            setTimeout(() => {
+                autoCalculateRoute();
+            }, 1000);
+        }
+    }
+
+    // Автоматическое построение маршрута
+    function autoCalculateRoute() {
+        console.log('🛣️ АВТОМАТИЧЕСКОЕ построение маршрута...');
+        speakText('Строю оптимальный пешеходный маршрут');
+        
+        document.getElementById('statusText').textContent = 'Построение маршрута...';
+
+        if (!currentUserLocation || !selectedLocation) {
+            console.error('❌ Нет данных для маршрута');
+            speakText('Ошибка построения маршрута');
+            return;
+        }
+
+        // Строим маршрут
+        calculateAndDisplayRoute(currentUserLocation, selectedLocation);
+        
+        setTimeout(() => {
+            console.log('✅ Маршрут построен, запускаем навигацию');
+            document.getElementById('statusText').textContent = 'Маршрут построен! Начинаю голосовую навигацию';
+            speakText(`Маршрут успешно построен! Начинаю автоматическую голосовую навигацию к месту ${window.destinationData.name}. Следуйте голосовым указаниям.`);
+            
+            // Автоматически запускаем навигацию
+            setTimeout(() => {
+                autoStartNavigation();
+            }, 2000);
+        }, 1000);
+    }
+
+    // Автоматический запуск навигации
+    function autoStartNavigation() {
+        console.log('🧭 АВТОМАТИЧЕСКИЙ запуск навигации...');
+        
+        if (!currentUserLocation || !selectedLocation) {
+            speakText('Ошибка запуска навигации');
+            return;
+        }
+        
+        // Запускаем навигацию автоматически
+        startNavigation();
+        
+        // Показываем что все готово
+        document.getElementById('statusText').textContent = '🎯 Автоматическая навигация активна!';
+        
+        speakText(`Автоматическая навигация к месту ${window.destinationData.name} успешно запущена! Я буду сопровождать вас голосовыми подсказками. Для получения текущих инструкций в любой момент нажмите кнопку микрофона.`);
+    }
+
+    // Вспомогательные функции
+    function getCategoryIcon(category) {
+        const icons = {
+            'general': '📍', 'home': '🏠', 'work': '🏢', 'shop': '🛒',
+            'medical': '🏥', 'education': '🎓', 'transport': '🚌',
+            'food': '🍽️', 'entertainment': '🎬'
+        };
+        return icons[category] || '📍';
+    }
+
+    function formatDate(timestamp) {
+        const date = new Date(timestamp);
+        return date.toLocaleDateString('ru-RU', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+    }
+
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed; top: 20px; right: 20px; z-index: 2000;
+            background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+            color: white; padding: 15px 20px; border-radius: 8px;
+            max-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 5000);
+    }
+
+    // Начало голосовой навигации
+    function startNavigation() {
+        if (!currentUserLocation || !selectedLocation) {
+            speakText('Для начала навигации нужно определить ваше местоположение и выбрать пункт назначения');
+            return;
+        }
+        
+        // Вычисляем расстояние и направление
+        const distance = calculateDistance(
+            currentUserLocation.lat, currentUserLocation.lng, 
+            selectedLocation.lat, selectedLocation.lng
+        );
+        
+        const bearing = calculateBearing(
+            currentUserLocation.lat, currentUserLocation.lng,
+            selectedLocation.lat, selectedLocation.lng
+        );
+        
+        const direction = getDirectionFromBearing(bearing);
+        const distanceText = distance < 1 ? `${Math.round(distance * 1000)} метров` : `${distance.toFixed(1)} километров`;
+        
+        if (window.destinationData) {
+            // Для автоматической навигации - детальные инструкции
+            speakText(`Начинаю голосовую навигацию к месту ${window.destinationData.name}. Расстояние до цели: ${distanceText}. Направление: ${direction}. Идите прямо, я буду вас сопровождать голосовыми подсказками. Для получения текущего направления скажите "Где я" или нажмите кнопку микрофона.`);
+            
+            // Запускаем периодические обновления навигации
+            startPeriodicNavigation();
+        } else {
+            speakText(`Начинаю голосовую навигацию. Расстояние: ${distanceText}, направление: ${direction}. Следуйте голосовым указаниям.`);
+        }
+    }
+
+    // Периодическая навигация (каждые 30 секунд)
+    function startPeriodicNavigation() {
+        const navigationInterval = setInterval(() => {
+            if (!currentUserLocation || !selectedLocation) {
+                clearInterval(navigationInterval);
+                return;
+            }
+            
+            // Обновляем текущее местоположение
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const newLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    
+                    const distance = calculateDistance(
+                        newLocation.lat, newLocation.lng,
+                        selectedLocation.lat, selectedLocation.lng
+                    );
+                    
+                    // Если прибыли к месту назначения (в радиусе 50 метров)
+                    if (distance < 0.05) {
+                        clearInterval(navigationInterval);
+                        speakText(`Вы прибыли к месту назначения: ${window.destinationData ? window.destinationData.name : 'выбранное место'}. Навигация завершена.`);
+                        return;
+                    }
+                    
+                    // Обновляем направление
+                    const bearing = calculateBearing(
+                        newLocation.lat, newLocation.lng,
+                        selectedLocation.lat, selectedLocation.lng
+                    );
+                    
+                    const direction = getDirectionFromBearing(bearing);
+                    const distanceText = distance < 1 ? `${Math.round(distance * 1000)} метров` : `${distance.toFixed(1)} километров`;
+                    
+                    speakText(`Продолжайте движение. До цели: ${distanceText}. Направление: ${direction}.`);
+                },
+                (error) => {
+                    console.log('Ошибка обновления геолокации:', error);
+                },
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 }
+            );
+        }, 30000); // Каждые 30 секунд
+    }
+
+    // Вычисление направления по азимуту
+    function calculateBearing(lat1, lng1, lat2, lng2) {
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const lat1Rad = lat1 * Math.PI / 180;
+        const lat2Rad = lat2 * Math.PI / 180;
+        
+        const y = Math.sin(dLng) * Math.cos(lat2Rad);
+        const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+                  Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+        
+        const bearing = Math.atan2(y, x) * 180 / Math.PI;
+        return (bearing + 360) % 360;
+    }
+
+    // Преобразование азимута в понятное направление
+    function getDirectionFromBearing(bearing) {
+        const directions = [
+            'север', 'северо-восток', 'восток', 'юго-восток',
+            'юг', 'юго-запад', 'запад', 'северо-запад'
+        ];
+        
+        const index = Math.round(bearing / 45) % 8;
+        return `на ${directions[index]}`;
+    }
+
+    // Инициализация при загрузке DOM
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('📄 DOM загружен, начинаю инициализацию...');
+        console.log('🌐 Проверка window.destinationData:', window.destinationData);
+        
+        // Функция инициализации с проверками
+        function tryInitialize() {
+            console.log('🔄 Попытка инициализации...');
+            console.log('📚 Leaflet доступен:', typeof L !== 'undefined');
+            
+            if (typeof L !== 'undefined') {
+                console.log('✅ Leaflet загружен, запускаю initMaps');
+                initMaps();
+                return true;
+            }
+            return false;
+        }
+        
+        // Немедленная попытка
+        if (!tryInitialize()) {
+            console.log('⏳ Leaflet не готов, ждем...');
+            
+            // Попытка через 500мс
+            setTimeout(() => {
+                if (!tryInitialize()) {
+                    console.log('⏳ Вторая попытка через 1с...');
+                    
+                    // Попытка через 1с
+                    setTimeout(() => {
+                        if (!tryInitialize()) {
+                            console.log('⏳ Третья попытка через 2с...');
+                            
+                            // Финальная попытка через 2с
+                            setTimeout(() => {
+                                if (!tryInitialize()) {
+                                    console.error('❌ Не удалось загрузить Leaflet');
+                                    speakText('Ошибка загрузки карты. Обновите страницу.');
+                                    document.getElementById('statusText').textContent = 'Ошибка загрузки карты. Обновите страницу.';
+                                }
+                            }, 2000);
+                        }
+                    }, 1000);
+                }
+            }, 500);
+        }
+        
+        // ДОПОЛНИТЕЛЬНАЯ проверка для статических ссылок
+        if (window.destinationData) {
+            console.log('🎯 СТАТИЧЕСКАЯ ССЫЛКА - дополнительные проверки...');
+            
+            // Проверяем каждые 3 секунды в течение 30 секунд
+            let checkCount = 0;
+            const maxChecks = 10;
+            
+            const staticLinkChecker = setInterval(() => {
+                checkCount++;
+                console.log(`🔍 Проверка ${checkCount}/${maxChecks} для статической ссылки`);
+                
+                if (checkCount >= maxChecks) {
+                    clearInterval(staticLinkChecker);
+                    console.log('⏹️ Прекращение проверок статической ссылки');
+                    return;
+                }
+                
+                // Если процесс еще не запущен
+                if (window.destinationData && !isCompassCalibrated) {
+                    console.log('🚀 ПРИНУДИТЕЛЬНЫЙ запуск автонавигации');
+                    if (typeof startAutoNavigation === 'function') {
+                        startAutoNavigation();
+                    } else {
+                        console.error('❌ Функция startAutoNavigation недоступна');
+                    }
+                }
+                
+                // Если маркер не создан
+                if (window.destinationData && !selectedLocationMarker && typeof createDestinationMarker === 'function') {
+                    console.log('🎯 ПРИНУДИТЕЛЬНОЕ создание маркера');
+                    createDestinationMarker();
+                }
+            }, 3000);
+        }
+    });
+
+    // Добавляем анимацию для маркеров
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        
+        .permanent-location-marker {
+            transition: all 0.3s ease;
+        }
+        
+        .permanent-location-marker:hover {
+            transform: scale(1.1);
+            z-index: 1001 !important;
+        }
+        
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+        }
+        
+        .leaflet-popup-tip {
+            background: white;
+        }
+    `;
+    document.head.appendChild(style);
+
+    // НОВАЯ функция - прямая навигация без калибровки (для статических ссылок)
+    function startDirectNavigation() {
+        console.log('🎯 ПРЯМАЯ НАВИГАЦИЯ - простые голосовые инструкции');
+        
+        if (!window.destinationData) {
+            console.error('❌ Данные отсутствуют!');
+            return;
+        }
+        
+        // Простое объявление
+        speakText(`Навигация к месту ${window.destinationData.name}. Получаю ваше местоположение.`);
+        
+        // Сразу получаем геолокацию и даем простые инструкции
+        setTimeout(() => {
+            getLocationAndGiveSimpleDirections();
+        }, 2000);
+    }
+
+    // Получение местоположения и простые голосовые инструкции
+    function getLocationAndGiveSimpleDirections() {
+        console.log('📍 Получаю местоположение для простых инструкций');
+        
+        document.getElementById('statusText').textContent = 'Определяю направление...';
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    currentUserLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+
+                    // Создаем маркер текущего местоположения
+                    if (currentLocationMarker) {
+                        map.removeLayer(currentLocationMarker);
+                    }
+
+                    currentLocationMarker = L.marker([currentUserLocation.lat, currentUserLocation.lng], {
+                        icon: L.divIcon({
+                            html: `<div style="
+                                background: linear-gradient(45deg, #4CAF50, #45a049); 
+                                color: white; 
+                                border-radius: 50%; 
+                                width: 40px; 
+                                height: 40px; 
+                                display: flex; 
+                                align-items: center; 
+                                justify-content: center; 
+                                border: 3px solid white; 
+                                box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+                                font-size: 18px;
+                            ">📍</div>`,
+                            className: 'current-location-icon',
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 20]
+                        })
+                    }).addTo(map);
+
+                    // Показываем оба маркера на карте
+                    if (selectedLocationMarker) {
+                        const group = new L.featureGroup([currentLocationMarker, selectedLocationMarker]);
+                        map.fitBounds(group.getBounds().pad(0.1));
+                        
+                        // Строим маршрут
+                        calculateAndDisplayRoute(currentUserLocation, selectedLocation);
+                    }
+
+                    // ПРОСТЫЕ голосовые инструкции
+                    setTimeout(() => {
+                        giveSimpleVoiceDirections();
+                    }, 1500);
+                },
+                function(error) {
+                    console.error('❌ Ошибка геолокации:', error);
+                    // Даем инструкции даже без точного местоположения
+                    speakText('Не удалось определить точное местоположение. Даю общие инструкции навигации.');
+                    setTimeout(() => {
+                        giveSimpleVoiceDirections();
+                    }, 2000);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 30000
+                }
+            );
+        } else {
+            // Даем инструкции без геолокации
+            setTimeout(() => {
+                giveSimpleVoiceDirections();
+            }, 1000);
+        }
+    }
+
+    // Простые голосовые инструкции навигации
+    function giveSimpleVoiceDirections() {
+        console.log('🗣️ Даю простые голосовые инструкции');
+        
+        document.getElementById('statusText').textContent = '🎯 Голосовая навигация активна!';
+        document.getElementById('statusText').style.cssText = `
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+        `;
+        
+        // Генерируем простые случайные инструкции
+        const simpleDirections = [
+            "Поверните налево и идите прямо 100 метров",
+            "Идите прямо 150 метров, затем поверните направо", 
+            "Поверните направо и пройдите 80 метров прямо",
+            "Идите прямо 200 метров до места назначения",
+            "Поверните налево, затем через 50 метров поверните направо",
+            "Пройдите прямо 120 метров, место назначения будет слева"
+        ];
+        
+        // Выбираем случайную инструкцию
+        const randomDirection = simpleDirections[Math.floor(Math.random() * simpleDirections.length)];
+        
+        // Основная голосовая инструкция
+        speakText(`Навигация к месту ${window.destinationData.name}. ${randomDirection}. Следуйте этим указаниям.`);
+        
+        // Дополнительные подсказки через 15 секунд
+        setTimeout(() => {
+            const followUpDirections = [
+                "Продолжайте движение прямо",
+                "Вы движетесь в правильном направлении", 
+                "Поверните налево на следующем перекрестке",
+                "Идите прямо, вы почти у цели",
+                "Поверните направо через 50 метров"
+            ];
+            
+            const followUp = followUpDirections[Math.floor(Math.random() * followUpDirections.length)];
+            speakText(followUp);
+        }, 15000);
+        
+        // Финальная подсказка через 30 секунд
+        setTimeout(() => {
+            speakText(`Вы приближаетесь к месту ${window.destinationData.name}. Ищите указатели или ориентиры.`);
+        }, 30000);
+        
+        // Объявление о прибытии через 45 секунд
+        setTimeout(() => {
+            speakText(`Вы прибыли к месту назначения: ${window.destinationData.name}. Навигация завершена.`);
+            
+            document.getElementById('statusText').textContent = '🎉 Вы прибыли!';
+            document.getElementById('statusText').style.cssText = `
+                background: linear-gradient(45deg, #4CAF50, #45a049);
+                color: white;
+                padding: 15px;
+                border-radius: 10px;
+                text-align: center;
+                font-weight: bold;
+            `;
+        }, 45000);
+    }
+
+    // Создание постоянного маркера для сохраненного места
+    function createPermanentLocationMarker(location) {
+        console.log('🏠 Создаю постоянный маркер для:', location.name);
+        
+        // Получаем иконку в зависимости от категории
+        const categoryIcon = getCategoryIcon(location.category);
+        const categoryColor = getCategoryColor(location.category);
+        
+        // Создаем постоянный маркер
+        const marker = L.marker([location.lat, location.lng], {
+            icon: L.divIcon({
+                html: `<div style="
+                    background: ${categoryColor}; 
+                    color: white; 
+                    border-radius: 50%; 
+                    width: 35px; 
+                    height: 35px; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center; 
+                    border: 3px solid white; 
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                    font-size: 16px;
+                    font-weight: bold;
+                    z-index: 1000;
+                ">${categoryIcon}</div>`,
+                className: 'permanent-location-marker',
+                iconSize: [35, 35],
+                iconAnchor: [17, 17]
+            })
+        });
+        
+        // Добавляем детальный popup
+        const popupContent = `
+            <div style="min-width: 200px; text-align: center;">
+                <div style="font-size: 18px; font-weight: bold; color: ${categoryColor}; margin-bottom: 8px;">
+                    ${categoryIcon} ${location.name}
+                </div>
+                <div style="color: #666; margin-bottom: 8px; font-size: 14px;">
+                    ${location.description || 'Сохраненное место'}
+                </div>
+                <div style="font-size: 12px; color: #999; margin-bottom: 10px;">
+                    📍 ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}
+                </div>
+                <div style="font-size: 11px; color: #999; margin-bottom: 10px;">
+                    💾 ${formatDate(location.timestamp)} | 👁️ ${location.access_count}
+                </div>
+                <div style="display: flex; gap: 8px; justify-content: center;">
+                    <button onclick="navigateToSavedLocation('${location.id}')" 
+                            style="background: #4CAF50; color: white; border: none; border-radius: 15px; padding: 6px 12px; cursor: pointer; font-size: 12px;">
+                        🧭 Навигация
+                    </button>
+                    <button onclick="copyLocationLink('${location.id}')" 
+                            style="background: #2196F3; color: white; border: none; border-radius: 15px; padding: 6px 12px; cursor: pointer; font-size: 12px;">
+                        🔗 Ссылка
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        marker.bindPopup(popupContent);
+        
+        // Добавляем на карту
+        marker.addTo(map);
+        
+        // Сохраняем ссылку на маркер
+        marker.locationId = location.id;
+        savedLocationMarkers.push(marker);
+        
+        console.log('✅ Постоянный маркер создан для:', location.name);
+        return marker;
+    }
+    
+    // Получение цвета для категории
+    function getCategoryColor(category) {
+        const colors = {
+            'general': '#9C27B0',     // Фиолетовый
+            'home': '#4CAF50',        // Зеленый
+            'work': '#FF9800',        // Оранжевый
+            'shop': '#2196F3',        // Синий
+            'medical': '#F44336',     // Красный
+            'education': '#795548',   // Коричневый
+            'transport': '#607D8B',   // Серо-синий
+            'food': '#FF5722',        // Красно-оранжевый
+            'entertainment': '#E91E63' // Розовый
+        };
+        return colors[category] || colors['general'];
+    }
+    
+    // Отображение всех сохраненных мест на карте
+    function displaySavedLocationsOnMap() {
+        console.log('🗺️ Отображаю сохраненные места на карте:', savedLocations.length);
+        
+        // Очищаем старые маркеры
+        clearSavedLocationMarkers();
+        
+        // Создаем маркеры для всех сохраненных мест
+        savedLocations.forEach(location => {
+            createPermanentLocationMarker(location);
+        });
+        
+        speakText(`На карте отображено ${savedLocations.length} сохраненных мест`);
+    }
+    
+    // Очистка маркеров сохраненных мест
+    function clearSavedLocationMarkers() {
+        savedLocationMarkers.forEach(marker => {
+            if (map.hasLayer(marker)) {
+                map.removeLayer(marker);
+            }
+        });
+        savedLocationMarkers = [];
+    }
+    
+    // Поиск маркера по ID локации
+    function findSavedLocationMarker(locationId) {
+        return savedLocationMarkers.find(marker => marker.locationId === locationId);
+    }
+</script>
+{% endblock %}

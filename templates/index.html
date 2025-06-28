@@ -1,0 +1,602 @@
+{% extends "base.html" %}
+
+{% block title %}SmartAla - Главная{% endblock %}
+
+{% block content %}
+<div class="main-container">
+    <header class="main-header">
+        <h1>🧭 SmartAla</h1>
+        <p class="subtitle">Умная навигационная система для незрячих</p>
+    </header>
+
+    <div class="main-actions">
+        <div class="action-card">
+            <h2>🗺️ Навигация с картой</h2>
+            <p>Интерактивная карта для выбора и сохранения мест с автоматическим построением маршрутов</p>
+            <a href="/navigate" class="action-btn primary">
+                🧭 Открыть навигацию
+            </a>
+        </div>
+
+        <div class="action-card">
+            <h2>📍 Сохранённые места</h2>
+            <p>Управление вашими сохранёнными местами и статическими ссылками</p>
+            <button onclick="showLocationManager()" class="action-btn secondary">
+                📍 Управление местами
+            </button>
+        </div>
+
+        <div class="action-card">
+            <h2>🎤 Голосовой помощник</h2>
+            <p>Используйте голосовые команды для управления навигацией</p>
+            <button onclick="startVoiceAssistant()" class="action-btn success">
+                🎤 Активировать голос
+            </button>
+        </div>
+    </div>
+
+    <!-- Быстрый доступ к сохранённым местам -->
+    <div class="saved-locations-preview">
+        <h3>📍 Ваши места</h3>
+        <div id="savedLocationsList" class="locations-grid">
+            <div class="loading-placeholder">
+                <div class="spinner"></div>
+                <p>Загружаю сохранённые места...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для управления местами -->
+<div id="locationModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h2>📍 Управление местами</h2>
+        <div id="modalLocationsList" class="modal-locations">
+            <!-- Места будут загружены динамически -->
+        </div>
+        <div class="modal-actions">
+            <button class="btn secondary" onclick="refreshLocations()">🔄 Обновить</button>
+            <button class="btn" onclick="closeLocationModal()">❌ Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .main-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .main-header {
+        text-align: center;
+        margin-bottom: 40px;
+        background: rgba(255,255,255,0.1);
+        padding: 40px;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+    }
+
+    .main-header h1 {
+        font-size: 3em;
+        margin-bottom: 15px;
+        color: white;
+        text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .subtitle {
+        font-size: 1.3em;
+        color: rgba(255,255,255,0.9);
+        font-weight: 300;
+    }
+
+    .main-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 30px;
+        margin-bottom: 50px;
+    }
+
+    .action-card {
+        background: rgba(255,255,255,0.1);
+        border-radius: 20px;
+        padding: 30px;
+        text-align: center;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+        transition: all 0.3s ease;
+    }
+
+    .action-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255,255,255,0.15);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+    }
+
+    .action-card h2 {
+        color: white;
+        margin-bottom: 15px;
+        font-size: 1.8em;
+    }
+
+    .action-card p {
+        color: rgba(255,255,255,0.8);
+        margin-bottom: 25px;
+        line-height: 1.6;
+    }
+
+    .action-btn {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 25px;
+        padding: 15px 30px;
+        font-size: 1.1em;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+        min-width: 200px;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .action-btn.primary {
+        background: linear-gradient(45deg, #4CAF50, #45a049);
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+    }
+
+    .action-btn.primary:hover {
+        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+    }
+
+    .action-btn.secondary {
+        background: linear-gradient(45deg, #2196F3, #1976D2);
+        box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+    }
+
+    .action-btn.secondary:hover {
+        box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+    }
+
+    .action-btn.success {
+        background: linear-gradient(45deg, #FF9800, #F57C00);
+        box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
+    }
+
+    .action-btn.success:hover {
+        box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+    }
+
+    .saved-locations-preview {
+        background: rgba(255,255,255,0.1);
+        border-radius: 20px;
+        padding: 30px;
+        backdrop-filter: blur(10px);
+    }
+
+    .saved-locations-preview h3 {
+        text-align: center;
+        color: white;
+        margin-bottom: 30px;
+        font-size: 1.8em;
+    }
+
+    .locations-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .location-card {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 15px;
+        padding: 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .location-card:hover {
+        transform: translateY(-3px);
+        background: rgba(255,255,255,0.2);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    }
+
+    .location-card h4 {
+        margin: 0 0 10px 0;
+        color: white;
+        font-size: 1.2em;
+    }
+
+    .location-card p {
+        margin: 0 0 10px 0;
+        color: rgba(255,255,255,0.7);
+        font-size: 0.9em;
+    }
+
+    .location-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 15px;
+        flex-wrap: wrap;
+    }
+
+    .action-btn-small {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 6px 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.8em;
+        flex: 1;
+        min-width: 60px;
+    }
+
+    .action-btn-small:hover {
+        background: rgba(255,255,255,0.3);
+        transform: scale(1.05);
+    }
+
+    .loading-placeholder {
+        grid-column: 1 / -1;
+        text-align: center;
+        color: white;
+        padding: 40px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255,255,255,0.3);
+        border-top: 4px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Модальное окно */
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background: rgba(255,255,255,0.95);
+        color: #333;
+        border-radius: 20px;
+        padding: 30px;
+        max-width: 90%;
+        max-height: 80%;
+        overflow-y: auto;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .modal-content h2 {
+        margin-bottom: 25px;
+        text-align: center;
+        color: #2c3e50;
+    }
+
+    .modal-locations {
+        max-height: 400px;
+        overflow-y: auto;
+        margin-bottom: 20px;
+    }
+
+    .modal-actions {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+    }
+
+    .btn {
+        background: linear-gradient(45deg, #4CAF50, #45a049);
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 12px 25px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .btn.secondary {
+        background: linear-gradient(45deg, #2196F3, #1976D2);
+    }
+
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    @media (max-width: 768px) {
+        .main-actions {
+            grid-template-columns: 1fr;
+        }
+        
+        .action-btn {
+            min-width: 150px;
+            padding: 12px 20px;
+        }
+        
+        .locations-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<script>
+    let savedLocations = [];
+
+    // Инициализация при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 Инициализация главной страницы...');
+        setTimeout(() => {
+            loadSavedLocations();
+        }, 500);
+    });
+
+    // Загрузка сохранённых мест
+    async function loadSavedLocations() {
+        console.log('📡 Загружаю сохранённые места...');
+        
+        try {
+            const response = await fetch('/list_saved_locations');
+            console.log('📡 Response status:', response.status);
+            
+            const data = await response.json();
+            console.log('📡 Response data:', data);
+            
+            if (data.success && data.locations && data.locations.length > 0) {
+                savedLocations = data.locations;
+                console.log('✅ Места загружены успешно:', data.locations.length, 'мест');
+                console.log('📍 Первое место:', data.locations[0]);
+                displaySavedLocations();
+            } else {
+                console.log('ℹ️ Нет сохранённых мест или данные не валидны');
+                console.log('ℹ️ data.success:', data.success);
+                console.log('ℹ️ data.locations:', data.locations);
+                showEmptyState();
+            }
+        } catch (error) {
+            console.error('❌ Ошибка загрузки мест:', error);
+            showErrorState();
+        }
+    }
+
+    // Отображение сохранённых мест
+    function displaySavedLocations() {
+        console.log('🎨 Начинаю отображение сохранённых мест...');
+        
+        const container = document.getElementById('savedLocationsList');
+        console.log('🎨 Container element:', container);
+        
+        if (!container) {
+            console.error('❌ Container savedLocationsList не найден!');
+            return;
+        }
+        
+        const limitedLocations = savedLocations.slice(0, 6); // Показываем только первые 6
+        console.log('🎨 Отображаю мест:', limitedLocations.length);
+        console.log('🎨 Locations data:', limitedLocations);
+        
+        const html = limitedLocations.map(location => `
+            <div class="location-card" onclick="navigateToLocation('${location.id}')">
+                <h4>${getCategoryIcon(location.category)} ${location.name}</h4>
+                <p>${location.description || 'Без описания'}</p>
+                <p style="font-size: 0.8em; opacity: 0.6;">
+                    💾 ${formatDate(location.timestamp)} | 👁️ ${location.access_count}
+                </p>
+                <div class="location-actions">
+                    <button class="action-btn-small" onclick="event.stopPropagation(); navigateToLocation('${location.id}')" title="Навигация">
+                        🧭
+                    </button>
+                    <button class="action-btn-small" onclick="event.stopPropagation(); copyLocationLink('${location.id}')" title="Поделиться">
+                        🔗
+                    </button>
+                    <button class="action-btn-small" onclick="event.stopPropagation(); deleteLocation('${location.id}')" title="Удалить">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        console.log('🎨 Generated HTML length:', html.length);
+        container.innerHTML = html;
+        console.log('🎨 Container innerHTML set successfully');
+
+        if (savedLocations.length > 6) {
+            container.innerHTML += `
+                <div class="location-card" onclick="showLocationManager()" style="border: 2px dashed rgba(255,255,255,0.3); text-align: center;">
+                    <h4>📍 Ещё ${savedLocations.length - 6} мест</h4>
+                    <p>Нажмите чтобы увидеть все сохранённые места</p>
+                    <div style="margin-top: 15px;">
+                        <span style="font-size: 2em;">➕</span>
+                    </div>
+                </div>
+            `;
+            console.log('🎨 Added "more locations" card');
+        }
+        
+        console.log('✅ Отображение завершено');
+    }
+
+    // Показать пустое состояние
+    function showEmptyState() {
+        document.getElementById('savedLocationsList').innerHTML = `
+            <div class="loading-placeholder">
+                <p>🗺️ Пока нет сохранённых мест</p>
+                <p style="opacity: 0.7; margin-bottom: 20px;">Перейдите в навигацию чтобы выбрать места на карте</p>
+                <a href="/navigate" class="action-btn primary">🧭 Открыть навигацию</a>
+            </div>
+        `;
+    }
+
+    // Показать ошибку
+    function showErrorState() {
+        document.getElementById('savedLocationsList').innerHTML = `
+            <div class="loading-placeholder">
+                <p>❌ Ошибка загрузки мест</p>
+                <button onclick="loadSavedLocations()" class="action-btn secondary">🔄 Попробовать снова</button>
+            </div>
+        `;
+    }
+
+    // Навигация к месту
+    function navigateToLocation(locationId) {
+        speakText('Переходим к навигации');
+        window.location.href = `/location/${locationId}`;
+    }
+
+    // Копирование ссылки
+    function copyLocationLink(locationId) {
+        const link = `${window.location.origin}/location/${locationId}`;
+        navigator.clipboard.writeText(link).then(() => {
+            speakText('Ссылка скопирована в буфер обмена');
+            showNotification('Ссылка скопирована!', 'success');
+        }).catch(err => {
+            console.error('Ошибка копирования:', err);
+            speakText('Ошибка копирования ссылки');
+        });
+    }
+
+    // Удаление места
+    function deleteLocation(locationId) {
+        const location = savedLocations.find(loc => loc.id === locationId);
+        if (!location) return;
+
+        if (confirm(`Удалить место "${location.name}"?`)) {
+            fetch(`/delete_location/${locationId}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        speakText(`Место ${location.name} удалено`);
+                        loadSavedLocations();
+                        showNotification('Место удалено', 'success');
+                    } else {
+                        throw new Error(data.error || 'Ошибка удаления');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка удаления:', error);
+                    speakText('Ошибка удаления места');
+                    showNotification('Ошибка удаления', 'error');
+                });
+        }
+    }
+
+    // Управление местами
+    function showLocationManager() {
+        speakText('Открываю управление местами');
+        loadSavedLocationsInModal();
+        document.getElementById('locationModal').style.display = 'flex';
+    }
+
+    function closeLocationModal() {
+        document.getElementById('locationModal').style.display = 'none';
+    }
+
+    // Загрузка в модальное окно
+    async function loadSavedLocationsInModal() {
+        const container = document.getElementById('modalLocationsList');
+        container.innerHTML = '<p>Загружаю...</p>';
+        
+        try {
+            const response = await fetch('/list_saved_locations');
+            const data = await response.json();
+            
+            if (data.success && data.locations.length > 0) {
+                container.innerHTML = data.locations.map(location => `
+                    <div class="location-card" style="margin-bottom: 15px;">
+                        <h4>${getCategoryIcon(location.category)} ${location.name}</h4>
+                        <p>${location.description || 'Без описания'}</p>
+                        <p style="font-size: 0.8em; color: #666;">
+                            📅 ${formatDate(location.timestamp)} | 👁️ ${location.access_count} просмотров
+                        </p>
+                        <div class="location-actions">
+                            <button class="action-btn-small" onclick="navigateToLocation('${location.id}')">🧭</button>
+                            <button class="action-btn-small" onclick="copyLocationLink('${location.id}')">🔗</button>
+                            <button class="action-btn-small" onclick="deleteLocation('${location.id}')">🗑️</button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p>Нет сохранённых мест</p>';
+            }
+        } catch (error) {
+            container.innerHTML = '<p>Ошибка загрузки</p>';
+        }
+    }
+
+    // Обновление списка
+    function refreshLocations() {
+        loadSavedLocations();
+        loadSavedLocationsInModal();
+        speakText('Список мест обновлён');
+    }
+
+    // Голосовой ассистент
+    function startVoiceAssistant() {
+        speakText('Голосовой ассистент активирован. Скажите команду.');
+        // Активация уже существующего голосового интерфейса из base.html
+        if (typeof startVoiceRecognition === 'function') {
+            startVoiceRecognition();
+        }
+    }
+
+    // Вспомогательные функции
+    function getCategoryIcon(category) {
+        const icons = {
+            'general': '📍', 'home': '🏠', 'work': '🏢', 'shop': '🛒',
+            'medical': '🏥', 'education': '🎓', 'transport': '🚌',
+            'food': '🍽️', 'entertainment': '🎬'
+        };
+        return icons[category] || '📍';
+    }
+
+    function formatDate(timestamp) {
+        const date = new Date(timestamp);
+        return date.toLocaleDateString('ru-RU', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+    }
+
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed; top: 20px; right: 20px; z-index: 2000;
+            background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+            color: white; padding: 15px 20px; border-radius: 8px;
+            max-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 4000);
+    }
+</script>
+{% endblock %} 
