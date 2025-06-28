@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  smartala-app:
+    build: .
+    container_name: smartala-navigation
+    ports:
+      - "80:5002"
+    environment:
+      - FLASK_ENV=production
+      - GEMINI_API_KEY=AIzaSyAa6831q1q_61pxjnatffMqWQEMPp9jRjQ
+      - GOOGLE_MAPS_API_KEY=AIzaSyBI_q34br_taffgYVlIs7hQ25yl3QjEXk0
+    volumes:
+      - ./audio_uploads:/app/audio_uploads
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - smartala-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: smartala-nginx
+    ports:
+      - "443:443"
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - smartala-app
+    restart: unless-stopped
+    networks:
+      - smartala-network
+
+networks:
+  smartala-network:
+    driver: bridge
+
+volumes:
+  audio_uploads:
+  logs: 

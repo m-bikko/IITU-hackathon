@@ -1,4 +1,6 @@
-Flask==2.3.3
-google-generativeai==0.7.2
+Flask==3.0.0
+google-generativeai==0.3.2
 python-dotenv==1.0.0
-Werkzeug==2.3.7 
+Werkzeug==3.0.1
+gunicorn==21.2.0
+requests==2.31.0 
